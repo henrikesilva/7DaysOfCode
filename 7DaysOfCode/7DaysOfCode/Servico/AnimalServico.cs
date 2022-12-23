@@ -1,34 +1,47 @@
-﻿using _7DaysOfCode.Model;
+﻿using _7DaysOfCode.Conversors;
+using _7DaysOfCode.Dto;
+using _7DaysOfCode.Model;
 using RestSharp;
-using System.Text.Json;
+using static _7DaysOfCode.Enum.PokemonsDto;
 
 namespace _7DaysOfCode.Servico
 {
     public class AnimalServico
     {
-        public async Task<List<Pokemon>> BuscarAnimal(string nomePokemon)
+        private readonly IConfiguration _configuration;
+        public AnimalServico(IConfiguration configuration)
+        {
+            _configuration = configuration;
+        }
+
+        public async Task<PokemonDto> BuscarAnimal(NomesPokemon nomePokemon)
         {
             try
             {
-                List<Pokemon> pokemons = new List<Pokemon>();
+                Pokemon pokemon = new Pokemon();
+                PokemonDto pokemonDto = new PokemonDto();
+                string apiUrl = _configuration.GetSection("Connections").GetSection("PokeApi").Value;
 
-                var client = new RestClient($"https://pokeapi.co/api/v2/pokemon/{nomePokemon}/");
+                RestResponse response = new RestResponse();
+
+                var client = new RestClient($"{apiUrl}/{(int)nomePokemon}/");
                 var request = new RestRequest();
                 request.Method = Method.Get;
-                RestResponse response = await client.ExecuteAsync(request);
+                response = await client.ExecuteAsync(request);
 
-                if (response.StatusCode == System.Net.HttpStatusCode.OK)
+                if ((!string.IsNullOrEmpty(response.Content)) && response.StatusCode == System.Net.HttpStatusCode.OK)
                 {
-                    var resultado = System.Text.Json.JsonSerializer.Deserialize<Pokemon>(response.Content);
-                    pokemons.Add(resultado);
-                    return pokemons;
+                    pokemon = System.Text.Json.JsonSerializer.Deserialize<Pokemon>(response.Content) ?? pokemon;
+                    pokemonDto = PokemonMapper.ConvertToDto(pokemon);
+
+                    return pokemonDto;
                 }
 
-                throw new ArgumentException("Erro ao buscar os dados!");
+                else return new PokemonDto();
             }
             catch (Exception ex)
             {
-                throw ex;
+                throw new ArgumentException("Ocorreu um erro: ", ex.Message);
             }
         }
     }
